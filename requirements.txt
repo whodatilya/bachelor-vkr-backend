@@ -10,3 +10,6 @@ sqlalchemy==1.4.25
 psycopg2==2.9.1
 bs4
 requests
+aiohttp
+asyncio
+chardet
