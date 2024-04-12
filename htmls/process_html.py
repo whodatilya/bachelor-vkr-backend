@@ -118,24 +118,16 @@ def check_del_ins(soup):
 
 
 
-def check_table(soup, file_path):
+def check_table(soup, file_path=None):
     tables = soup.find_all('table')
     errors = []
-    encoding = get_encoding(file_path)
+    # encoding = get_encoding(file_path)
 
     for i, table in enumerate(tables):
         if not table.find('tr') or not (table.find('th') or table.find('td')):
             pattern = re.compile(r'<table(?:\s|>)', re.IGNORECASE)
-            with open(file_path, 'r', encoding=encoding) as f:
-                lines = f.readlines()
-                line_number = None
-                for j, line in enumerate(lines):
-                    if pattern.search(line):
-                        line_number = j + 1
-                        break
-            if line_number is not None:
-                error_msg = f'Неправильное использование тега <table> (строка {line_number})'
-                errors.append(error_msg)
+            error_msg = f'Неправильное использование тега <table> (таблица {i + 1})'
+            errors.append(error_msg)
 
     return len(errors) == 0, errors
 
@@ -182,8 +174,7 @@ def check_headings(soup):
     return len(errors) == 0, errors
 
 
-def check_nav_tag(soup, file_path):
-    encoding = get_encoding(file_path)
+def check_nav_tag(soup, file_path=None):
     nav_tags = soup.find_all('nav')
     div_navs = soup.find_all(lambda tag: tag.name == 'div' and ('id' in tag.attrs and tag['id'] == 'nav' or 'class' in tag.attrs and 'nav' in tag['class']))
 
@@ -191,40 +182,85 @@ def check_nav_tag(soup, file_path):
         return True, []
 
     errors = []
-    with open(file_path, 'r', encoding=encoding) as f:
-        lines = f.readlines()
-        for i, div in enumerate(div_navs):
-            pattern = re.compile(r'<div(?:\s+(?:id|class)="nav"(?:\s+|>)|>)', re.IGNORECASE)
-            line_number = None
-            for j, line in enumerate(lines):
-                if pattern.search(line):
-                    line_number = j + 1
-                    break
-            if line_number is not None:
-                error_msg = f'Нужно использовать nav вместо div с id/class=nav (строка {line_number})'
-                errors.append(error_msg)
+    if len(div_navs) > 0:
+        error_msg = 'Нужно использовать nav вместо div с id/class=nav'
+        errors.append(error_msg)
 
     return False, errors
 
 
+def correct_errors(soup, errors):
+    for error in errors:
+        if "Отсутствует тег <figcaption> внутри тега <figure>" in error:
+            for figure in soup.find_all('figure'):
+                if not figure.find('figcaption'):
+                    figcaption = soup.new_tag('figcaption')
+                    # Перемещаем всех детей figure в figcaption
+                    while len(figure.contents) > 0:
+                        child = figure.contents[0]
+                        child.extract()
+                        figcaption.append(child)
+                    # Добавляем figcaption в figure
+                    figure.append(figcaption)
+        elif "Нужно использовать nav вместо div с id/class=nav" in error:
+            for div in soup.select('div[id*="nav"], div[class*="nav"], div[id*="navigation"], div[class*="navigation"]'):
+                print('div', div)
+                nav = soup.new_tag('nav')
+                # Объединяем атрибуты div и nav
+                nav.attrs.update(div.attrs)
+                # Перемещаем всех детей div в nav
+                while len(div.contents) > 0:
+                    child = div.contents[0]
+                    child.extract()
+                    nav.append(child)
+                # Заменяем div на nav
+                div.replace_with(nav)
+        elif "Необходимо использовать тег <header> для обозначения шапки страницы" in error:
+            for div in soup.select('div[id*="header"], div[class*="header"], div[id*="head"], div[class*="head"]'):
+                header = soup.new_tag('header')
+                # Объединяем атрибуты div и nav
+                header.attrs.update(div.attrs)
+                # Перемещаем всех детей div в nav
+                while len(div.contents) > 0:
+                    child = div.contents[0]
+                    child.extract()
+                    header.append(child)
+                # Заменяем div на nav
+                div.replace_with(header)
+        elif "Необходимо использовать тег <main> для обозначения основного контента страницы" in error:
+            for div in soup.select('div[id*="main"], div[class*="main"], div[id*="content"], div[class*="content"]'):
+                main = soup.new_tag('main')
+                # Объединяем атрибуты div и nav
+                main.attrs.update(div.attrs)
+                # Перемещаем всех детей div в nav
+                while len(div.contents) > 0:
+                    child = div.contents[0]
+                    child.extract()
+                    main.append(child)
+                # Заменяем div на nav
+                div.replace_with(main)
+        elif "Необходимо использовать тег <footer> для обозначения подвала страницы" in error:
+            for div in soup.select('div[id*="footer"], div[class*="footer"]'):
+                footer = soup.new_tag('footer')
+                # Объединяем атрибуты div и nav
+                footer.attrs.update(div.attrs)
+                # Перемещаем всех детей div в nav
+                while len(div.contents) > 0:
+                    child = div.contents[0]
+                    child.extract()
+                    footer.append(child)
+                # Заменяем div на nav
+                div.replace_with(footer)
 
-def calculate_score(soup, file_path, criteria):
-    total_criteria = len(criteria)
-    correct_criteria = [0] * total_criteria
-    all_errors = []
-
-    for i, criterion in enumerate(criteria):
-        is_correct, errors = criterion(soup, file_path) if isinstance(criterion, types.FunctionType) and 'file_path' in inspect.signature(criterion).parameters else criterion(soup)
-        correct_criteria[i] = 1 if is_correct else 0
-        all_errors.extend(errors)
-
-    score = sum(correct_criteria) / total_criteria if total_criteria > 0 else 0
-    return correct_criteria, all_errors
+    return soup
 
 
 
 
-import chardet
+
+
+
+
 
 def get_encoding(file_path):
     with open(file_path, 'rb') as f:
@@ -244,9 +280,22 @@ def get_encoding(file_path):
     return encoding
 
 
+def calculate_score(soup, file_path, criteria):
+    total_criteria = len(criteria)
+    correct_criteria = [0] * total_criteria
+    all_errors = []
 
+    for i, criterion in enumerate(criteria):
+        is_correct, errors = criterion(soup, file_path) if isinstance(criterion, types.FunctionType) and 'file_path' in inspect.signature(criterion).parameters else criterion(soup)
+        correct_criteria[i] = 1 if is_correct else 0
+        all_errors.extend(errors)
 
-def mark_files(directory, output_file):
+    score = sum(correct_criteria) / total_criteria if total_criteria > 0 else 0
+    return correct_criteria, all_errors
+
+def process_html(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+
     criteria = [
         check_table,
         check_logical_blocks,
@@ -265,49 +314,50 @@ def mark_files(directory, output_file):
         check_del_ins
     ]
 
-    total_files = 0
-    processed_files = 0
+    score, errors = calculate_score(soup, None, criteria)
 
-    for root, _, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.html'):
-                total_files += 1
+    print(f'Score: {score}')
+    if errors:
+        print('Errors found:')
+        for error in errors:
+            print(f'- {error}')
 
-    with open(output_file, 'w', newline='', encoding='utf_8_sig') as csvfile:
-        writer = csv.writer(csvfile)
-        header_row = ['file_path', 'score'] + [c.__name__ for c in criteria] + ['errors']
-        writer.writerow(header_row)
+    corrected_soup = correct_errors(soup, errors)
+    corrected_html = str(corrected_soup)
 
-        for root, _, files in os.walk(directory):
-            for file in files:
-                if file.endswith('.html'):
-                    file_path = os.path.join(root, file)
-                    encoding = get_encoding(file_path)
-                    with open(file_path, 'r', encoding=encoding) as html_file:
-                        soup = BeautifulSoup(html_file, 'html.parser')
-                        scores, errors = calculate_score(soup, file_path, criteria)
-                        score = sum(scores) / len(criteria)
-                        row = [file_path, round(score, 2)] + scores + [', '.join(errors)]
-                        writer.writerow(row)
-                        processed_files += 1
-                        percentage = (processed_files / total_files) * 100
-                        print(f'Processed {processed_files}/{total_files} files ({percentage:.2f}%)')
-
+    return corrected_html
 
 
 if __name__ == '__main__':
-    html_directory = 'D:\\PycharmProjects\\backend\\htmls\\dataset\\archive'
-    output_files = {
-        'training': 'D:\\PycharmProjects\\backend\\htmls\\marked_dataset\\training.csv',
-        'validation': 'D:\\PycharmProjects\\backend\\htmls\\marked_dataset\\validation.csv'
-    }
+    # Получение HTML-кода от пользователя
+    html_content = '''
+    <html>
+        <body>
+            <div class="header 123">
+                <div class="nav 123">
+                    нав в хедере
+                </div>
+            </div>
+            <div class="head 123">
+                просто хедер
+            </div>
+            <div class="content 123">
+                контент
+            </div>
+            <div class="main 1233">
+                <div id="navigation 33123">
+                    нав в мейне
+                </div>
+                <figure>
+                    картинка в фигуре в мейне
+                    <img src="example.jpg" alt="Example image">
+                </figure>
+            </div>
+        </body>
+    </html>
+    '''
 
-    # Проходим по директориям training и validation
-    for subdir in ['training', 'validation']:
-        subdir_path = os.path.join(html_directory, subdir)
-        output_file = output_files[subdir]
-
-        # Проходим по директориям Phish и NotPhish
-        for label in ['Phish', 'NotPhish']:
-            label_path = os.path.join(subdir_path, label)
-            mark_files(label_path, output_file)
+    # Обработка HTML-кода и получение исправленного HTML
+    corrected_html = process_html(html_content)
+    print('\nCorrected HTML:')
+    print(corrected_html)
