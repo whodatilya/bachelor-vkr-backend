@@ -1,11 +1,29 @@
-import os
 from bs4 import BeautifulSoup
 import chardet
 import re
-import csv
-from functools import reduce
 import inspect
 import types
+import spacy
+
+
+
+nlp = spacy.load("en_core_web_sm")
+
+
+def extract_contact_info(html):
+    # Регулярные выражения для поиска телефона, email и адреса
+    phone_regex = r'(?:\+?(\d[\d\s()]*)?(\([\d\s()]+\))?[\d\s()-]+\d|\+?7?\s?\(?(\d{3})\)?[-.\s]?\d{3}[-.\s]?\d{2}[-.\s]?\d{2})'
+    email_regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    address_regex = r'(?:\d{1,4}[\s.,-]?[\w\s.,-]{2,}(?:street|st|avenue|ave|road|rd|highway|hwy|square|sq|trail|trl|drive|dr|court|ct|park|pk|lane|ln|boulevard|blvd|circle|cir|plaza|plz|alley|aly|way|wy|point|pt|parkway|pkwy|commune|cm|district|dist|province|prov|region|reg|territory|terr|city|cty|town|tn|village|vlg|municipality|mun|county|cnty|state|st|country|cntry|ул|пр|просп|пер|ш|шоссе|бульв|бульвар|наб|набережн|пл|площ|площадь)\.?\s?[\w\s.-]{2,})(?:\d{1,4}[\s.,-]?[\w\s.,-]{2,})?(?:кв|комн|комната|офис|офис|к|квартира)\.?\s?\d{1,4}\b'
+
+    # Ищем контактную информацию в HTML-коде
+    contacts = {'phone': [], 'email': [], 'address': []}
+    contacts['phone'].extend([match[0] for match in re.findall(phone_regex, html)])
+    contacts['email'].extend(re.findall(email_regex, html))
+    contacts['address'].extend([match[0] for match in re.findall(address_regex, html)])
+
+    return contacts
+
 
 def check_figure(soup):
     figures = soup.find_all('figure')
@@ -251,14 +269,49 @@ def correct_errors(soup, errors):
                     footer.append(child)
                 # Заменяем div на nav
                 div.replace_with(footer)
+        elif "Постарайтесь использовать тэг <address> для указания контактной информации автора или владельца сайта" in error:
+            # Находим контактную информацию
+            contact_info = extract_contact_info(str(soup))
+
+            # Создаем тег <address>
+            address = soup.new_tag('address')
+
+            # Добавляем контактную информацию в тег <address>
+            for label, texts in contact_info.items():
+                for text in texts:
+                    if text:
+                        if label == 'phone':
+                            phone = soup.new_tag('a', href=f'tel:{text}')
+                            phone.string = text
+                            address.append(phone)
+                        elif label == 'email':
+                            email = soup.new_tag('a', href=f'mailto:{text}')
+                            email.string = text
+                            address.append(email)
+                        elif label == 'address':
+                            address_text = soup.new_tag('p')
+                            address_text.string = text
+                            address.append(address_text)
+
+            # Добавляем тег <address> в конец тега <body>
+            body = soup.body
+            body.append(address)
+
+            # Удаляем контактную информацию из исходного места
+            for label, texts in contact_info.items():
+                for text in texts:
+                    if text:
+                        if label == 'phone':
+                            phone_tag = soup.find('a', href=f'tel:{text}')
+                            phone_tag.extract()
+                        elif label == 'email':
+                            email_tag = soup.find('a', href=f'mailto:{text}')
+                            email_tag.extract()
+                        elif label == 'address':
+                            address_text = soup.find(string=re.compile(re.escape(text)))
+                            address_text.extract()
 
     return soup
-
-
-
-
-
-
 
 
 
@@ -320,10 +373,10 @@ def process_html(html_content):
     if errors:
         print('Errors found:')
         for error in errors:
-            print(f'- {error}')
+            print(f'{error}')
 
     corrected_soup = correct_errors(soup, errors)
-    corrected_html = str(corrected_soup)
+    corrected_html = corrected_soup.prettify()
 
     return corrected_html
 
@@ -353,6 +406,7 @@ if __name__ == '__main__':
                     <img src="example.jpg" alt="Example image">
                 </figure>
             </div>
+            <a href="mailto:gordeevilyas@yandex.ru">gordeevilyas@yandex.ru</a>
         </body>
     </html>
     '''
