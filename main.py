@@ -4,6 +4,7 @@ from auth.route import router as auth_router
 from core.security import JWTAuth
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.requests import Request
+from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from htmls.process_html import process_html
 
@@ -14,8 +15,17 @@ app.include_router(guest_router)
 app.include_router(user_router)
 app.include_router(auth_router)
 
+origins = ["http://localhost:5173"]
+
 # Add Middleware
 app.add_middleware(AuthenticationMiddleware, backend=JWTAuth())
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get('/')
 def health_check():
