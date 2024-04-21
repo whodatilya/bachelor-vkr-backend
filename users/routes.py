@@ -7,6 +7,7 @@ from users.services import create_user_account
 from core.security import oauth2_scheme
 from users.responses import UserResponse;
 
+
 router = APIRouter(
     prefix="/users",
     tags=["Users"],
