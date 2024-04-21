@@ -3,11 +3,7 @@ import chardet
 import re
 import inspect
 import types
-import spacy
 
-
-
-nlp = spacy.load("en_core_web_sm")
 
 
 def extract_contact_info(html):
@@ -220,9 +216,9 @@ def correct_errors(soup, errors):
                         figcaption.append(child)
                     # Добавляем figcaption в figure
                     figure.append(figcaption)
+            errors.remove('Отсутствует тег <figcaption> внутри тега <figure>')
         elif "Нужно использовать nav вместо div с id/class=nav" in error:
             for div in soup.select('div[id*="nav"], div[class*="nav"], div[id*="navigation"], div[class*="navigation"]'):
-                print('div', div)
                 nav = soup.new_tag('nav')
                 # Объединяем атрибуты div и nav
                 nav.attrs.update(div.attrs)
@@ -233,6 +229,7 @@ def correct_errors(soup, errors):
                     nav.append(child)
                 # Заменяем div на nav
                 div.replace_with(nav)
+            errors.remove('Нужно использовать nav вместо div с id/class=nav')
         elif "Необходимо использовать тег <header> для обозначения шапки страницы" in error:
             for div in soup.select('div[id*="header"], div[class*="header"], div[id*="head"], div[class*="head"]'):
                 header = soup.new_tag('header')
@@ -245,6 +242,7 @@ def correct_errors(soup, errors):
                     header.append(child)
                 # Заменяем div на nav
                 div.replace_with(header)
+            errors.remove('Необходимо использовать тег <header> для обозначения шапки страницы')
         elif "Необходимо использовать тег <main> для обозначения основного контента страницы" in error:
             for div in soup.select('div[id*="main"], div[class*="main"], div[id*="content"], div[class*="content"]'):
                 main = soup.new_tag('main')
@@ -257,6 +255,7 @@ def correct_errors(soup, errors):
                     main.append(child)
                 # Заменяем div на nav
                 div.replace_with(main)
+            errors.remove('Необходимо использовать тег <main> для обозначения основного контента страницы')
         elif "Необходимо использовать тег <footer> для обозначения подвала страницы" in error:
             for div in soup.select('div[id*="footer"], div[class*="footer"]'):
                 footer = soup.new_tag('footer')
@@ -269,6 +268,7 @@ def correct_errors(soup, errors):
                     footer.append(child)
                 # Заменяем div на nav
                 div.replace_with(footer)
+            errors.remove('Необходимо использовать тег <footer> для обозначения подвала страницы')
         elif "Постарайтесь использовать тэг <address> для указания контактной информации автора или владельца сайта" in error:
             # Находим контактную информацию
             contact_info = extract_contact_info(str(soup))
@@ -310,6 +310,7 @@ def correct_errors(soup, errors):
                         elif label == 'address':
                             address_text = soup.find(string=re.compile(re.escape(text)))
                             address_text.extract()
+            errors.remove('Постарайтесь использовать тэг <address> для указания контактной информации автора или владельца сайта')
 
     return soup
 
@@ -344,9 +345,9 @@ def calculate_score(soup, file_path, criteria):
         all_errors.extend(errors)
 
     score = sum(correct_criteria) / total_criteria if total_criteria > 0 else 0
-    return correct_criteria, all_errors
+    return correct_criteria, all_errors, score
 
-def process_html(html_content):
+async def process_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
 
     criteria = [
@@ -367,51 +368,10 @@ def process_html(html_content):
         check_del_ins
     ]
 
-    score, errors = calculate_score(soup, None, criteria)
-
-    print(f'Score: {score}')
-    if errors:
-        print('Errors found:')
-        for error in errors:
-            print(f'{error}')
+    score, errors, ratio = calculate_score(soup, None, criteria)
 
     corrected_soup = correct_errors(soup, errors)
     corrected_html = corrected_soup.prettify()
 
-    return corrected_html
+    return {'corrected_html': corrected_html, 'errors': errors, 'score': ratio}
 
-
-if __name__ == '__main__':
-    # Получение HTML-кода от пользователя
-    html_content = '''
-    <html>
-        <body>
-            <div class="header 123">
-                <div class="nav 123">
-                    нав в хедере
-                </div>
-            </div>
-            <div class="head 123">
-                просто хедер
-            </div>
-            <div class="content 123">
-                контент
-            </div>
-            <div class="main 1233">
-                <div id="navigation 33123">
-                    нав в мейне
-                </div>
-                <figure>
-                    картинка в фигуре в мейне
-                    <img src="example.jpg" alt="Example image">
-                </figure>
-            </div>
-            <a href="mailto:gordeevilyas@yandex.ru">gordeevilyas@yandex.ru</a>
-        </body>
-    </html>
-    '''
-
-    # Обработка HTML-кода и получение исправленного HTML
-    corrected_html = process_html(html_content)
-    print('\nCorrected HTML:')
-    print(corrected_html)
