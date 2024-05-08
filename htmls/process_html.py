@@ -28,7 +28,7 @@ def check_figure(soup):
 
     for i, figure in enumerate(figures):
         if not figure.find('figcaption'):
-            error_msg = f'Отсутствует тег <figcaption> внутри тега <figure> (фигура {i + 1})'
+            error_msg = f'Отсутствует тег <figcaption> внутри тега <figure>'
             errors.append(error_msg)
         else:
             correct_figures += 1
@@ -204,115 +204,134 @@ def check_nav_tag(soup, file_path=None):
 
 
 def correct_errors(soup, errors):
+    error_handlers = {
+        "Отсутствует тег <figcaption> внутри тега <figure>": handle_figcaption_error,
+        "Нужно использовать nav вместо div с id/class=nav": handle_nav_error,
+        "Необходимо использовать тег <header> для обозначения шапки страницы": handle_header_error,
+        "Необходимо использовать тег <main> для обозначения основного контента страницы": handle_main_error,
+        "Необходимо использовать тег <footer> для обозначения подвала страницы": handle_footer_error,
+        "Постарайтесь использовать тэг <address> для указания контактной информации автора или владельца сайта": handle_address_error
+    }
+
+    corrected_errors = []
+
     for error in errors:
-        if "Отсутствует тег <figcaption> внутри тега <figure>" in error:
-            for figure in soup.find_all('figure'):
-                if not figure.find('figcaption'):
-                    figcaption = soup.new_tag('figcaption')
-                    # Перемещаем всех детей figure в figcaption
-                    while len(figure.contents) > 0:
-                        child = figure.contents[0]
-                        child.extract()
-                        figcaption.append(child)
-                    # Добавляем figcaption в figure
-                    figure.append(figcaption)
-            errors.remove('Отсутствует тег <figcaption> внутри тега <figure>')
-        elif "Нужно использовать nav вместо div с id/class=nav" in error:
-            for div in soup.select('div[id*="nav"], div[class*="nav"], div[id*="navigation"], div[class*="navigation"]'):
-                nav = soup.new_tag('nav')
-                # Объединяем атрибуты div и nav
-                nav.attrs.update(div.attrs)
-                # Перемещаем всех детей div в nav
-                while len(div.contents) > 0:
-                    child = div.contents[0]
-                    child.extract()
-                    nav.append(child)
-                # Заменяем div на nav
-                div.replace_with(nav)
-            errors.remove('Нужно использовать nav вместо div с id/class=nav')
-        elif "Необходимо использовать тег <header> для обозначения шапки страницы" in error:
-            for div in soup.select('div[id*="header"], div[class*="header"], div[id*="head"], div[class*="head"]'):
-                header = soup.new_tag('header')
-                # Объединяем атрибуты div и nav
-                header.attrs.update(div.attrs)
-                # Перемещаем всех детей div в nav
-                while len(div.contents) > 0:
-                    child = div.contents[0]
-                    child.extract()
-                    header.append(child)
-                # Заменяем div на nav
-                div.replace_with(header)
-            errors.remove('Необходимо использовать тег <header> для обозначения шапки страницы')
-        elif "Необходимо использовать тег <main> для обозначения основного контента страницы" in error:
-            for div in soup.select('div[id*="main"], div[class*="main"], div[id*="content"], div[class*="content"]'):
-                main = soup.new_tag('main')
-                # Объединяем атрибуты div и nav
-                main.attrs.update(div.attrs)
-                # Перемещаем всех детей div в nav
-                while len(div.contents) > 0:
-                    child = div.contents[0]
-                    child.extract()
-                    main.append(child)
-                # Заменяем div на nav
-                div.replace_with(main)
-            errors.remove('Необходимо использовать тег <main> для обозначения основного контента страницы')
-        elif "Необходимо использовать тег <footer> для обозначения подвала страницы" in error:
-            for div in soup.select('div[id*="footer"], div[class*="footer"]'):
-                footer = soup.new_tag('footer')
-                # Объединяем атрибуты div и nav
-                footer.attrs.update(div.attrs)
-                # Перемещаем всех детей div в nav
-                while len(div.contents) > 0:
-                    child = div.contents[0]
-                    child.extract()
-                    footer.append(child)
-                # Заменяем div на nav
-                div.replace_with(footer)
-            errors.remove('Необходимо использовать тег <footer> для обозначения подвала страницы')
-        elif "Постарайтесь использовать тэг <address> для указания контактной информации автора или владельца сайта" in error:
-            # Находим контактную информацию
-            contact_info = extract_contact_info(str(soup))
+        if error in error_handlers:
+            error_handlers[error](soup)
+            corrected_errors.append(error)
 
-            # Создаем тег <address>
-            address = soup.new_tag('address')
-
-            # Добавляем контактную информацию в тег <address>
-            for label, texts in contact_info.items():
-                for text in texts:
-                    if text:
-                        if label == 'phone':
-                            phone = soup.new_tag('a', href=f'tel:{text}')
-                            phone.string = text
-                            address.append(phone)
-                        elif label == 'email':
-                            email = soup.new_tag('a', href=f'mailto:{text}')
-                            email.string = text
-                            address.append(email)
-                        elif label == 'address':
-                            address_text = soup.new_tag('p')
-                            address_text.string = text
-                            address.append(address_text)
-
-            # Добавляем тег <address> в конец тега <body>
-            body = soup.body
-            body.append(address)
-
-            # Удаляем контактную информацию из исходного места
-            for label, texts in contact_info.items():
-                for text in texts:
-                    if text:
-                        if label == 'phone':
-                            phone_tag = soup.find('a', href=f'tel:{text}')
-                            phone_tag.extract()
-                        elif label == 'email':
-                            email_tag = soup.find('a', href=f'mailto:{text}')
-                            email_tag.extract()
-                        elif label == 'address':
-                            address_text = soup.find(string=re.compile(re.escape(text)))
-                            address_text.extract()
-            errors.remove('Постарайтесь использовать тэг <address> для указания контактной информации автора или владельца сайта')
+    # Удаляем исправленные ошибки из списка errors
+    for error in corrected_errors:
+        errors.remove(error)
 
     return soup
+
+def handle_figcaption_error(soup):
+    for figure in soup.find_all('figure'):
+        if not figure.find('figcaption'):
+            figcaption = soup.new_tag('figcaption')
+            # Перемещаем всех детей figure в figcaption
+            while len(figure.contents) > 0:
+                child = figure.contents[0]
+                child.extract()
+                figcaption.append(child)
+            # Добавляем figcaption в figure
+            figure.append(figcaption)
+
+def handle_nav_error(soup):
+    for div in soup.select('div[id*="nav"], div[class*="nav"], div[id*="navigation"], div[class*="navigation"]'):
+        nav = soup.new_tag('nav')
+        # Объединяем атрибуты div и nav
+        nav.attrs.update(div.attrs)
+        # Перемещаем всех детей div в nav
+        while len(div.contents) > 0:
+            child = div.contents[0]
+            child.extract()
+            nav.append(child)
+        # Заменяем div на nav
+        div.replace_with(nav)
+
+def handle_header_error(soup):
+    for div in soup.select('div[id*="header"], div[class*="header"], div[id*="head"], div[class*="head"]'):
+        header = soup.new_tag('header')
+        # Объединяем атрибуты div и header
+        header.attrs.update(div.attrs)
+        # Перемещаем всех детей div в header
+        while len(div.contents) > 0:
+            child = div.contents[0]
+            child.extract()
+            header.append(child)
+        # Заменяем div на header
+        div.replace_with(header)
+
+def handle_main_error(soup):
+    for div in soup.select('div[id*="main"], div[class*="main"], div[id*="content"], div[class*="content"]'):
+        main = soup.new_tag('main')
+        # Объединяем атрибуты div и main
+        main.attrs.update(div.attrs)
+        # Перемещаем всех детей div в main
+        while len(div.contents) > 0:
+            child = div.contents[0]
+            child.extract()
+            main.append(child)
+        # Заменяем div на nav
+        div.replace_with(main)
+
+def handle_footer_error(soup):
+    for div in soup.select('div[id*="footer"], div[class*="footer"]'):
+        footer = soup.new_tag('footer')
+        # Объединяем атрибуты div и nav
+        footer.attrs.update(div.attrs)
+        # Перемещаем всех детей div в nav
+        while len(div.contents) > 0:
+            child = div.contents[0]
+            child.extract()
+            footer.append(child)
+        # Заменяем div на nav
+        div.replace_with(footer)
+
+def handle_address_error(soup):
+    # Находим контактную информацию
+    contact_info = extract_contact_info(str(soup))
+
+    # Создаем тег <address>
+    address = soup.new_tag('address')
+
+    # Добавляем контактную информацию в тег <address>
+    for label, texts in contact_info.items():
+        for text in texts:
+            if text:
+                if label == 'phone':
+                    phone = soup.new_tag('a', href=f'tel:{text}')
+                    phone.string = text
+                    address.append(phone)
+                elif label == 'email':
+                    email = soup.new_tag('a', href=f'mailto:{text}')
+                    email.string = text
+                    address.append(email)
+                elif label == 'address':
+                    address_text = soup.new_tag('p')
+                    address_text.string = text
+                    address.append(address_text)
+
+    # Добавляем тег <address> в конец тега <body>
+    body = soup.body
+    body.append(address)
+
+    # Удаляем контактную информацию из исходного места
+    for label, texts in contact_info.items():
+        for text in texts:
+            if text:
+                if label == 'phone':
+                    phone_tag = soup.find('a', href=f'tel:{text}')
+                    phone_tag.extract()
+                elif label == 'email':
+                    email_tag = soup.find('a', href=f'mailto:{text}')
+                    email_tag.extract()
+                elif label == 'address':
+                    address_text = soup.find(string=re.compile(re.escape(text)))
+                    address_text.extract()
+
 
 
 
