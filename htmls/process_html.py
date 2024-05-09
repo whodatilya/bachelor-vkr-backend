@@ -239,7 +239,8 @@ def handle_figcaption_error(soup):
             figure.append(figcaption)
 
 def handle_nav_error(soup):
-    for div in soup.select('div[id*="nav"], div[class*="nav"], div[id*="navigation"], div[class*="navigation"]'):
+    selection_model = 'div[id*="nav"], div[class*="nav"], div[id*="navigation"], div[class*="navigation"], div[class*="navbar"], div[id*="navbar"]'
+    for div in soup.select(selection_model):
         nav = soup.new_tag('nav')
         # Объединяем атрибуты div и nav
         nav.attrs.update(div.attrs)
@@ -252,7 +253,8 @@ def handle_nav_error(soup):
         div.replace_with(nav)
 
 def handle_header_error(soup):
-    for div in soup.select('div[id*="header"], div[class*="header"], div[id*="head"], div[class*="head"]'):
+    selection_model = 'div[id*="header"], div[class*="header"], div[id*="head"], div[class*="head"]'
+    for div in soup.select(selection_model):
         header = soup.new_tag('header')
         # Объединяем атрибуты div и header
         header.attrs.update(div.attrs)
@@ -265,7 +267,8 @@ def handle_header_error(soup):
         div.replace_with(header)
 
 def handle_main_error(soup):
-    for div in soup.select('div[id*="main"], div[class*="main"], div[id*="content"], div[class*="content"]'):
+    selection_model = 'div[id*="main"], div[class*="main"], div[id*="content"], div[class*="content"]'
+    for div in soup.select(selection_model):
         main = soup.new_tag('main')
         # Объединяем атрибуты div и main
         main.attrs.update(div.attrs)
@@ -278,7 +281,8 @@ def handle_main_error(soup):
         div.replace_with(main)
 
 def handle_footer_error(soup):
-    for div in soup.select('div[id*="footer"], div[class*="footer"]'):
+    selection_model = 'div[id*="footer"], div[class*="footer"]'
+    for div in soup.select(selection_model):
         footer = soup.new_tag('footer')
         # Объединяем атрибуты div и nav
         footer.attrs.update(div.attrs)
