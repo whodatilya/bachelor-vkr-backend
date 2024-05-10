@@ -92,7 +92,7 @@ def check_abbr(soup):
 
     for i, abbr in enumerate(abbrs):
         if 'title' not in abbr.attrs:
-            error_msg = f'Отсутствует атрибут title в теге <abbr> (сокращение {i + 1})'
+            error_msg = f'Отсутствует атрибут title в теге <abbr>'
             errors.append(error_msg)
         else:
             correct_abbrs += 1
@@ -140,7 +140,7 @@ def check_table(soup, file_path=None):
     for i, table in enumerate(tables):
         if not table.find('tr') or not (table.find('th') or table.find('td')):
             pattern = re.compile(r'<table(?:\s|>)', re.IGNORECASE)
-            error_msg = f'Неправильное использование тега <table> (таблица {i + 1})'
+            error_msg = f'Неправильное использование тега <table>'
             errors.append(error_msg)
 
     return len(errors) == 0, errors
@@ -224,7 +224,7 @@ def correct_errors(soup, errors):
     for error in corrected_errors:
         errors.remove(error)
 
-    return soup
+    return soup, corrected_errors
 
 def handle_figcaption_error(soup):
     for figure in soup.find_all('figure'):
@@ -393,8 +393,8 @@ async def process_html(html_content):
 
     score, errors, ratio = calculate_score(soup, None, criteria)
 
-    corrected_soup = correct_errors(soup, errors)
+    corrected_soup, corrected_errors = correct_errors(soup, errors)
     corrected_html = corrected_soup.prettify()
 
-    return {'corrected_html': corrected_html, 'errors': errors, 'score': ratio}
+    return {'corrected_html': corrected_html, 'corrected_errors': corrected_errors, 'recommendations': errors, 'score': ratio}
 
